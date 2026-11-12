@@ -1,4 +1,5 @@
 """Обработка одного листа и общий отчёт report.md."""
+
 from __future__ import annotations
 
 import functools
@@ -10,8 +11,15 @@ import traceback
 from pathlib import Path
 
 from .extract import extract
-from .output import (view_boxes, write_contour_json, write_empty_contour, write_failure_image, write_overlay,
-                     write_preview, write_zoom)
+from .output import (
+    view_boxes,
+    write_contour_json,
+    write_empty_contour,
+    write_failure_image,
+    write_overlay,
+    write_preview,
+    write_zoom,
+)
 from .sheet import SUPPORTED_EXT, deskew_mode, load_sheet, pdf_page_count, render_dpi
 from .verdict import Verdict, decide, image_px, verdict_fingerprint, zoom_max, zoom_plan, zoom_px
 
@@ -46,8 +54,8 @@ def out_dir_for(src: Path, in_root: Path, out_root: Path, all_inputs: list[Path]
     return out_root / rel.parent / name
 
 
-PAGE_DIR = "_лист{}"            # окончание папки результата для страницы N многостраничного PDF
-PAGE_REL = " [лист {}]"         # то же в report.md, файлах ревью и логах
+PAGE_DIR = "_лист{}"  # окончание папки результата для страницы N многостраничного PDF
+PAGE_REL = " [лист {}]"  # то же в report.md, файлах ревью и логах
 _PAGE_REL_RE = re.compile(r"^(.*) \[лист (\d+)\]$")
 
 
@@ -195,8 +203,9 @@ def process_file(src: Path, od: Path, rel: str, page: int = 0) -> dict:
         failed = True
         tb = traceback.format_exc()
         log += ["", "== FAILED ==", f"{type(e).__name__}: {e}", tb]
-        verdict = Verdict("red", f"лист не разобран: {type(e).__name__}: {e}",
-                          "program: sheet not processed (model not asked)")
+        verdict = Verdict(
+            "red", f"лист не разобран: {type(e).__name__}: {e}", "program: sheet not processed (model not asked)"
+        )
         try:
             write_empty_contour(od / "contour.json", rel, f"{type(e).__name__}: {e}")
         except Exception:
@@ -215,17 +224,30 @@ def process_file(src: Path, od: Path, rel: str, page: int = 0) -> dict:
         log += ["request:", verdict.model_request, "", "response:", verdict.model_response or ""]
     else:
         log.append(f"not asked: {verdict.source}")
-    log += ["", "== verdict ==", f"{verdict.verdict}: {verdict.reason}", f"decided by: {verdict.source}",
-            f"time: {time.time() - t0:.1f}s"]
+    log += [
+        "",
+        "== verdict ==",
+        f"{verdict.verdict}: {verdict.reason}",
+        f"decided by: {verdict.source}",
+        f"time: {time.time() - t0:.1f}s",
+    ]
     (od / "log.txt").write_text("\n".join(log) + "\n", encoding="utf-8", newline="\n")
     (od / "verdict.txt").write_text(f"{verdict.verdict}\n{verdict.reason}\n", encoding="utf-8", newline="\n")
-    summary = {"file": rel, "verdict": verdict.verdict, "reason": verdict.reason,
-               "source": verdict.source, "metrics": metrics}
+    summary = {
+        "file": rel,
+        "verdict": verdict.verdict,
+        "reason": verdict.reason,
+        "source": verdict.source,
+        "metrics": metrics,
+    }
     # done.json отмечает результат, который не нужно переделывать; упавший лист
     # и вердикт, потерянный из-за временной ошибки модели, повторяются при следующем запуске
     if not failed and not verdict.source.startswith(RETRY_SOURCES):
-        (od / DONE_FILE).write_text(json.dumps({"sha1": src_sha, "fingerprint": run_fingerprint(), **summary},
-                                               ensure_ascii=False, indent=1), encoding="utf-8", newline="\n")
+        (od / DONE_FILE).write_text(
+            json.dumps({"sha1": src_sha, "fingerprint": run_fingerprint(), **summary}, ensure_ascii=False, indent=1),
+            encoding="utf-8",
+            newline="\n",
+        )
     return summary
 
 
@@ -236,8 +258,12 @@ def write_crashed(od: Path, rel: str, err: BaseException) -> dict:
     od.mkdir(parents=True, exist_ok=True)
     reason = f"обработка упала: {type(err).__name__}: {err}"
     (od / "verdict.txt").write_text(f"red\n{reason}\n", encoding="utf-8", newline="\n")
-    (od / "log.txt").write_text(f"file: {rel}\n\n== FAILED ==\nworker process died twice: {err!r}\n\n"
-                                f"== verdict ==\nred: {reason}\ndecided by: program error\n", encoding="utf-8", newline="\n")
+    (od / "log.txt").write_text(
+        f"file: {rel}\n\n== FAILED ==\nworker process died twice: {err!r}\n\n"
+        f"== verdict ==\nred: {reason}\ndecided by: program error\n",
+        encoding="utf-8",
+        newline="\n",
+    )
     write_empty_contour(od / "contour.json", rel, f"{type(err).__name__}: {err}")
     write_failure_image(od / "overlay.png", f"worker process died: {type(err).__name__}: {err}")
     return {"file": rel, "verdict": "red", "reason": reason, "source": "program error", "metrics": {}}
@@ -268,12 +294,20 @@ def write_report(out_root: Path, summaries: list[dict]) -> Path:
             k = "программа (модель не спрашивали или она не ответила)"
         by_source[k] = by_source.get(k, 0) + 1
     lines = [
-        "# Контур детали: отчёт по архиву", "",
-        f"Листов: **{len(summaries)}**", "",
-        "| вердикт | листов |", "|---|---|",
-        f"| green | {counts['green']} |", f"| yellow | {counts['yellow']} |", f"| red | {counts['red']} |", "",
-        "Кто ставил вердикт: " + ", ".join(f"{k}: {v}" for k, v in sorted(by_source.items())), "",
-        "## Три самых слабых листа", "",
+        "# Контур детали: отчёт по архиву",
+        "",
+        f"Листов: **{len(summaries)}**",
+        "",
+        "| вердикт | листов |",
+        "|---|---|",
+        f"| green | {counts['green']} |",
+        f"| yellow | {counts['yellow']} |",
+        f"| red | {counts['red']} |",
+        "",
+        "Кто ставил вердикт: " + ", ".join(f"{k}: {v}" for k, v in sorted(by_source.items())),
+        "",
+        "## Три самых слабых листа",
+        "",
     ]
     for i, s in enumerate(weakest, 1):
         lines.append(f"{i}. `{s['file']}` — **{s['verdict']}**: {s['reason']}")

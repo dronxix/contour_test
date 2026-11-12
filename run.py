@@ -7,9 +7,11 @@
 затем пишет report.md рядом с результатами. Уже обработанные листы (тот же
 файл, код и настройки, полный результат) пропускаются, если не задан --force.
 """
+
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import os
 import sys
@@ -57,16 +59,14 @@ def main() -> int:
     ap.add_argument("input", type=Path)
     ap.add_argument("output", type=Path)
     ap.add_argument("--workers", type=int, default=max(1, min(8, (os.cpu_count() or 2) - 1)))
-    ap.add_argument("--force", action="store_true",
-                    help="re-process everything (same as RUN_SCOPE=all in .env)")
-    ap.add_argument("--env", type=Path, default=None,
-                    help="settings file (default: .env in the project folder, if present)")
+    ap.add_argument("--force", action="store_true", help="re-process everything (same as RUN_SCOPE=all in .env)")
+    ap.add_argument(
+        "--env", type=Path, default=None, help="settings file (default: .env in the project folder, if present)"
+    )
     a = ap.parse_args()
 
-    try:
+    if isinstance(sys.stdout, io.TextIOWrapper):
         sys.stdout.reconfigure(encoding="utf-8")
-    except Exception:
-        pass
     # настройки должны попасть в os.environ до запуска процессов-исполнителей
     try:
         taken = load_env(a.env)
@@ -80,11 +80,13 @@ def main() -> int:
     if a.force:
         scope = "all"
     src = a.env or (DEFAULT_ENV if DEFAULT_ENV.exists() else None)
-    print(f"settings: {src or 'environment only'} ({len(taken)} keys from file); dpi {dpi:g}; "
-          f"deskew {dsk}; run scope: {scope}{' (--force)' if a.force else ''}; verdict mode: {md}"
-          + (f", {api_type()} API, model {setting('VERDICT_MODEL')} at {api_base()}" if md == "model" else "")
-          + (f", review file {setting('VERDICT_REVIEW_FILE')}" if md == "review" else "")
-          + f"; zoom {setting('VERDICT_ZOOM', 'auto')}")
+    print(
+        f"settings: {src or 'environment only'} ({len(taken)} keys from file); dpi {dpi:g}; "
+        f"deskew {dsk}; run scope: {scope}{' (--force)' if a.force else ''}; verdict mode: {md}"
+        + (f", {api_type()} API, model {setting('VERDICT_MODEL')} at {api_base()}" if md == "model" else "")
+        + (f", review file {setting('VERDICT_REVIEW_FILE')}" if md == "review" else "")
+        + f"; zoom {setting('VERDICT_ZOOM', 'auto')}"
+    )
     if not a.input.is_dir():
         print(f"input folder not found: {a.input}", file=sys.stderr)
         return 2
@@ -93,8 +95,10 @@ def main() -> int:
     inputs = find_inputs(a.input, exclude=a.output)
     sheets = plan_jobs(inputs, a.input, a.output)
     extra = len(sheets) - len(inputs)
-    print(f"found {len(inputs)} drawings in {a.input}"
-          + (f" ({len(sheets)} sheets: multi-page PDFs give one sheet per page)" if extra else ""))
+    print(
+        f"found {len(inputs)} drawings in {a.input}"
+        + (f" ({len(sheets)} sheets: multi-page PDFs give one sheet per page)" if extra else "")
+    )
     jobs, summaries = [], []
     for src, od, rel, page in sheets:
         if scope == "new" and is_done(src, od):
@@ -105,8 +109,10 @@ def main() -> int:
             continue
         jobs.append((str(src), str(od), rel, page))
     if len(jobs) < len(sheets):
-        print(f"skipping {len(sheets) - len(jobs)} already processed and unchanged; "
-              f"processing {len(jobs)} new or changed (RUN_SCOPE=all or --force redoes everything)")
+        print(
+            f"skipping {len(sheets) - len(jobs)} already processed and unchanged; "
+            f"processing {len(jobs)} new or changed (RUN_SCOPE=all or --force redoes everything)"
+        )
 
     n = len(jobs)
     done = 0
@@ -139,8 +145,14 @@ def main() -> int:
                     s = write_crashed(Path(j[1]), j[2], err)
                 except Exception as e:
                     # даже файлы red записать не удалось: лист остаётся только в отчёте
-                    s = {"file": j[2], "verdict": "red", "reason": f"обработка упала: {type(err).__name__}: {err}; "
-                         f"результат не записан: {type(e).__name__}: {e}", "source": "program error", "metrics": {}}
+                    s = {
+                        "file": j[2],
+                        "verdict": "red",
+                        "reason": f"обработка упала: {type(err).__name__}: {err}; "
+                        f"результат не записан: {type(e).__name__}: {e}",
+                        "source": "program error",
+                        "metrics": {},
+                    }
                 locked(s)
 
         with ThreadPoolExecutor(max_workers=max(1, a.workers)) as tx:

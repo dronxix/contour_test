@@ -3,9 +3,11 @@
 Всё детерминировано: пиксели обходятся построчно, случайности нет, поэтому
 одна и та же маска всегда даёт одни и те же отрезки.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from itertools import pairwise
 
 import cv2
 import numpy as np
@@ -17,9 +19,10 @@ _NEIGH = [(-1, 0), (0, -1), (0, 1), (1, 0), (-1, -1), (-1, 1), (1, -1), (1, 1)]
 @dataclass
 class Edge:
     """Ребро графа: цепочка пикселей скелета между двумя узлами."""
-    a: int                      # узел в начале (-1 у замкнутого кольца)
-    b: int                      # узел в конце  (-1 у замкнутого кольца)
-    pts: np.ndarray             # массив (N, 2) координат (x, y) в пикселях
+
+    a: int  # узел в начале (-1 у замкнутого кольца)
+    b: int  # узел в конце  (-1 у замкнутого кольца)
+    pts: np.ndarray  # массив (N, 2) координат (x, y) в пикселях
     closed: bool = False
 
     @property
@@ -34,6 +37,7 @@ class Edge:
 @dataclass
 class Graph:
     """Граф скелета: узлы (концы и развилки) и рёбра между ними."""
+
     nodes: list[tuple[float, float]] = field(default_factory=list)  # центры узлов (x, y)
     edges: list[Edge] = field(default_factory=list)
 
@@ -129,7 +133,7 @@ def skeleton_graph(skel: np.ndarray) -> Graph:
             continue
         visited[y0, x0] = True
         path = [(x0, y0)]
-        py, px, cy_, cx_ = -10, -10, y0, x0
+        cy_, cx_ = y0, x0
         while True:
             nxt = None
             for dy, dx in _NEIGH:
@@ -165,7 +169,7 @@ def simplify(pts: np.ndarray, eps: float, closed: bool) -> np.ndarray:
 def polyline_segments(pts: np.ndarray) -> list[tuple[float, float, float, float]]:
     """Ломаная -> список отрезков (x1, y1, x2, y2), без отрезков нулевой длины."""
     segs = []
-    for (x1, y1), (x2, y2) in zip(pts[:-1], pts[1:]):
+    for (x1, y1), (x2, y2) in pairwise(pts):
         if x1 == x2 and y1 == y2:
             continue
         segs.append((x1, y1, x2, y2))

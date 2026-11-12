@@ -1,4 +1,5 @@
 """Чтение листа (PDF или картинка), выравнивание, формат листа и масштаб в мм."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -30,11 +31,21 @@ def render_dpi() -> float:
         raise ValueError(f"CONTOUR_DPI must be 72..1200, got {dpi:g}")
     return dpi
 
+
 # форматы листов по ГОСТ 2.301: (короткая сторона, длинная сторона) в мм
 FORMATS = {
-    "A4": (210, 297), "A3": (297, 420), "A2": (420, 594), "A1": (594, 841), "A0": (841, 1189),
-    "A4x3": (297, 630), "A4x4": (297, 841), "A4x5": (297, 1051),
-    "A3x3": (420, 891), "A3x4": (420, 1189), "A2x3": (594, 1261), "A1x3": (841, 1783),
+    "A4": (210, 297),
+    "A3": (297, 420),
+    "A2": (420, 594),
+    "A1": (594, 841),
+    "A0": (841, 1189),
+    "A4x3": (297, 630),
+    "A4x4": (297, 841),
+    "A4x5": (297, 1051),
+    "A3x3": (420, 891),
+    "A3x4": (420, 1189),
+    "A2x3": (594, 1261),
+    "A1x3": (841, 1783),
 }
 
 # Основная надпись (штамп) по ГОСТ 2.104 всегда 185 мм в ширину; высота
@@ -50,15 +61,16 @@ STAMP_FORMS = ((55.0, "form 1"), (40.0, "form 2"), (15.0, "form 2a"))
 @dataclass
 class Sheet:
     """Прочитанный лист и то, что о нём известно."""
+
     path: Path
-    gray: np.ndarray                 # uint8, бумага светлая, линии тёмные
-    source: str                      # "image" или "pdf"
+    gray: np.ndarray  # uint8, бумага светлая, линии тёмные
+    source: str  # "image" или "pdf"
     pages: int = 1
-    file_dpi: float | None = None    # dpi рендера PDF или из метаданных картинки
+    file_dpi: float | None = None  # dpi рендера PDF или из метаданных картинки
     notes: list[str] = field(default_factory=list)
-    upscale: int = 1                 # во сколько раз gray увеличен для обработки
-    deskew_deg: float = 0.0          # на какой угол gray повёрнут, чтобы стать ровным
-    geometry_changed: bool = False   # перспектива изменила масштаб листа: dpi страницы уже не точен
+    upscale: int = 1  # во сколько раз gray увеличен для обработки
+    deskew_deg: float = 0.0  # на какой угол gray повёрнут, чтобы стать ровным
+    geometry_changed: bool = False  # перспектива изменила масштаб листа: dpi страницы уже не точен
 
 
 def _imread_unicode(path: Path) -> np.ndarray:
@@ -76,6 +88,7 @@ def _image_dpi(path: Path) -> float | None:
     """DPI из метаданных картинки или None (значения 50 и меньше считаются мусором)."""
     try:
         from PIL import Image
+
         with Image.open(path) as im:
             dpi = im.info.get("dpi")
         if dpi and dpi[0] and float(dpi[0]) > 50:
@@ -85,8 +98,8 @@ def _image_dpi(path: Path) -> float | None:
     return None
 
 
-DESKEW_MIN_DEG = 0.1     # меньший наклон не трогаем: по всему листу это доли пикселя
-DESKEW_MAX_DEG = 10.0    # больший «наклон» — уже не кривой скан, угадывать не беремся
+DESKEW_MIN_DEG = 0.1  # меньший наклон не трогаем: по всему листу это доли пикселя
+DESKEW_MAX_DEG = 10.0  # больший «наклон» — уже не кривой скан, угадывать не беремся
 
 
 DESKEW_MODES = ("off", "rotate", "perspective")
@@ -108,11 +121,11 @@ def _profile_sharpness(xs: np.ndarray, ys: np.ndarray, deg: float, n: int) -> fl
     каждая в одну строку (столбец) только при верном угле."""
     a = np.radians(deg)
     c, s = np.cos(a), np.sin(a)
-    r = np.round(ys * c - xs * s).astype(np.int64)     # строка каждого пикселя после поворота
-    k = np.round(xs * c + ys * s).astype(np.int64)     # столбец
+    r = np.round(ys * c - xs * s).astype(np.int64)  # строка каждого пикселя после поворота
+    k = np.round(xs * c + ys * s).astype(np.int64)  # столбец
     hr = np.bincount(r - r.min(), minlength=1).astype(np.float64)
     hc = np.bincount(k - k.min(), minlength=1).astype(np.float64)
-    return float((hr ** 2).sum() + (hc ** 2).sum()) / n ** 2
+    return float((hr**2).sum() + (hc**2).sum()) / n**2
 
 
 def skew_angle(gray: np.ndarray) -> tuple[float | None, str]:
@@ -130,7 +143,7 @@ def skew_angle(gray: np.ndarray) -> tuple[float | None, str]:
     ys, xs = np.nonzero(t)
     if len(xs) < 1000:
         return None, "almost no ink"
-    step = max(1, len(xs) // 300_000)                  # пикселей достаточно, время ограничено
+    step = max(1, len(xs) // 300_000)  # пикселей достаточно, время ограничено
     xs = xs[::step].astype(np.float64)
     ys = ys[::step].astype(np.float64)
     n = len(xs)
@@ -150,7 +163,7 @@ def skew_angle(gray: np.ndarray) -> tuple[float | None, str]:
     return fine, f"projection profile, contrast {contrast:.2f}"
 
 
-def deskew(sheet: "Sheet") -> "Sheet":
+def deskew(sheet: Sheet) -> Sheet:
     """Повернуть наклонный лист ровно (размер картинки тот же, углы заливаются белым)."""
     a, why = skew_angle(sheet.gray)
     if a is None:
@@ -161,17 +174,19 @@ def deskew(sheet: "Sheet") -> "Sheet":
         return sheet
     h, w = sheet.gray.shape
     M = cv2.getRotationMatrix2D((w / 2, h / 2), a, 1.0)
-    sheet.gray = cv2.warpAffine(sheet.gray, M, (w, h), flags=cv2.INTER_CUBIC,
-                                borderMode=cv2.BORDER_CONSTANT, borderValue=255)
+    sheet.gray = cv2.warpAffine(
+        sheet.gray, M, (w, h), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_CONSTANT, borderValue=255
+    )
     sheet.deskew_deg = a
-    sheet.notes.append(f"deskew: sheet tilted {a:+.2f} deg ({why}), rotated upright; "
-                       "contour coordinates are in the upright sheet")
+    sheet.notes.append(
+        f"deskew: sheet tilted {a:+.2f} deg ({why}), rotated upright; contour coordinates are in the upright sheet"
+    )
     return sheet
 
 
-PERSPECTIVE_MIN_PX = 2.0     # углы рамки ближе этого к ровному прямоугольнику: лист не трогаем
-FRAME_SIDE_SUPPORT = 0.6     # у стороны рамки не меньше этой доли голосов самой длинной линии своего направления
-FRAME_MAX_TILT_DEG = 20.0    # стороны рамки отклоняются от осей не больше чем на столько (фото под углом)
+PERSPECTIVE_MIN_PX = 2.0  # углы рамки ближе этого к ровному прямоугольнику: лист не трогаем
+FRAME_SIDE_SUPPORT = 0.6  # у стороны рамки не меньше этой доли голосов самой длинной линии своего направления
+FRAME_MAX_TILT_DEG = 20.0  # стороны рамки отклоняются от осей не больше чем на столько (фото под углом)
 
 
 def _frame_component(t: np.ndarray) -> tuple[np.ndarray | None, str]:
@@ -196,7 +211,7 @@ def _frame_component(t: np.ndarray) -> tuple[np.ndarray | None, str]:
 def _side_lines(mask: np.ndarray, horizontal: bool) -> list[tuple[float, float, int]]:
     """Сильные прямые одного направления в маске: (rho, theta, голоса) по Хафу."""
     tilt = np.radians(FRAME_MAX_TILT_DEG)
-    step = np.pi / 1800                                   # 0,1°
+    step = np.pi / 1800  # 0,1°
     thr = int(0.3 * min(mask.shape))
     ranges = [(np.pi / 2 - tilt, np.pi / 2 + tilt)] if horizontal else [(0.0, tilt), (np.pi - tilt, np.pi)]
     out = []
@@ -261,9 +276,10 @@ def frame_quad(gray: np.ndarray) -> tuple[np.ndarray | None, str]:
         strong = [(r, th) for r, th, v in lines if v >= FRAME_SIDE_SUPPORT * top]
 
         # положение каждой прямой поперёк листа: y посередине ширины или x посередине высоты
-        def pos(l):
-            r, th = l
+        def pos(line, horizontal=horizontal):
+            r, th = line
             return (r - (w / 2) * np.cos(th)) / np.sin(th) if horizontal else (r - (h / 2) * np.sin(th)) / np.cos(th)
+
         strong.sort(key=pos)
         if len(strong) < 2 or pos(strong[-1]) - pos(strong[0]) < 0.5 * (h if horizontal else w):
             return None, f"only one {'horizontal' if horizontal else 'vertical'} frame side found"
@@ -278,10 +294,15 @@ def frame_quad(gray: np.ndarray) -> tuple[np.ndarray | None, str]:
                 return None, "frame side could not be fitted"
             refined.append(r)
     top_l, bot_l, left_l, right_l = refined
-    q = np.array([_intersect(top_l, left_l), _intersect(top_l, right_l),
-                  _intersect(bot_l, right_l), _intersect(bot_l, left_l)])
-    if not (np.all(q[:, 0] > -0.05 * w) and np.all(q[:, 0] < 1.05 * w)
-            and np.all(q[:, 1] > -0.05 * h) and np.all(q[:, 1] < 1.05 * h)):
+    q = np.array(
+        [_intersect(top_l, left_l), _intersect(top_l, right_l), _intersect(bot_l, right_l), _intersect(bot_l, left_l)]
+    )
+    if not (
+        np.all(q[:, 0] > -0.05 * w)
+        and np.all(q[:, 0] < 1.05 * w)
+        and np.all(q[:, 1] > -0.05 * h)
+        and np.all(q[:, 1] < 1.05 * h)
+    ):
         return None, "frame corners fall outside the image"
     return q, "ok"
 
@@ -294,7 +315,8 @@ def _stamp_stretch(gray: np.ndarray) -> tuple[float | None, str]:
     (185:55, 185:40 или 185:15 по форме), поэтому после первой правки его
     измеренное соотношение показывает, насколько лист ещё растянут по вертикали.
     """
-    from .extract import measure_stamp      # импорт здесь: extract сам импортирует этот модуль
+    from .extract import measure_stamp  # импорт здесь: extract сам импортирует этот модуль
+
     _, t = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
     mask, why = _frame_component(t)
     if mask is None:
@@ -306,7 +328,7 @@ def _stamp_stretch(gray: np.ndarray) -> tuple[float | None, str]:
     return k, f"title block {stamp['w_px']:.0f}x{stamp['h_px']:.0f} px -> height x{k:.4f}"
 
 
-def unwarp(sheet: "Sheet") -> "Sheet":
+def unwarp(sheet: Sheet) -> Sheet:
     """Убрать перспективу (фото под углом) и поворот.
 
     Шаг 1: четыре угла рамки переносятся на ровный прямоугольник со
@@ -324,8 +346,9 @@ def unwarp(sheet: "Sheet") -> "Sheet":
     # рамка уже ровный прямоугольник (экспорт из CAD, ровный скан): не перерисовываем
     off_axis = max(abs(tl[0] - bl[0]), abs(tr[0] - br[0]), abs(tl[1] - tr[1]), abs(bl[1] - br[1]))
     if off_axis < PERSPECTIVE_MIN_PX:
-        sheet.notes.append(f"perspective: frame is already an upright rectangle "
-                           f"(corners off axis by {off_axis:.1f} px), not changed")
+        sheet.notes.append(
+            f"perspective: frame is already an upright rectangle (corners off axis by {off_axis:.1f} px), not changed"
+        )
         return sheet
     width = (np.hypot(*(tr - tl)) + np.hypot(*(br - bl))) / 2
     height = (np.hypot(*(bl - tl)) + np.hypot(*(br - tr))) / 2
@@ -335,13 +358,16 @@ def unwarp(sheet: "Sheet") -> "Sheet":
     def target(W, H):
         cx = float(np.clip(q[:, 0].mean(), W / 2, w - W / 2)) if W < w else w / 2
         cy = float(np.clip(q[:, 1].mean(), H / 2, h - H / 2)) if H < h else h / 2
-        return np.array([[cx - W / 2, cy - H / 2], [cx + W / 2, cy - H / 2],
-                         [cx + W / 2, cy + H / 2], [cx - W / 2, cy + H / 2]], np.float32)
+        return np.array(
+            [[cx - W / 2, cy - H / 2], [cx + W / 2, cy - H / 2], [cx + W / 2, cy + H / 2], [cx - W / 2, cy + H / 2]],
+            np.float32,
+        )
 
     def warp(dst):
         M = cv2.getPerspectiveTransform(src, dst)
-        return cv2.warpPerspective(sheet.gray, M, (w, h), flags=cv2.INTER_CUBIC,
-                                   borderMode=cv2.BORDER_CONSTANT, borderValue=255)
+        return cv2.warpPerspective(
+            sheet.gray, M, (w, h), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_CONSTANT, borderValue=255
+        )
 
     first = warp(target(width, height))
     k, how = _stamp_stretch(first)
@@ -354,8 +380,10 @@ def unwarp(sheet: "Sheet") -> "Sheet":
         sheet.gray = warp(target(W, H))
     sheet.geometry_changed = True
     c = ", ".join(f"({x:.0f},{y:.0f})" for x, y in q)
-    sheet.notes.append(f"perspective: frame corners {c} mapped onto an upright {W:.0f}x{H:.0f} px rectangle; "
-                       f"{how}; contour coordinates are in the corrected sheet")
+    sheet.notes.append(
+        f"perspective: frame corners {c} mapped onto an upright {W:.0f}x{H:.0f} px rectangle; "
+        f"{how}; contour coordinates are in the corrected sheet"
+    )
     return sheet
 
 
@@ -366,6 +394,7 @@ def pdf_page_count(path: Path) -> int:
         return 1
     try:
         import pymupdf
+
         with pymupdf.open(str(path)) as doc:
             return max(1, doc.page_count)
     except Exception:
@@ -392,6 +421,7 @@ def _read(path: Path, page: int = 0) -> Sheet:
     ext = path.suffix.lower()
     if ext in PDF_EXT:
         import pymupdf
+
         with pymupdf.open(str(path)) as doc:
             if doc.page_count == 0:
                 raise ValueError("PDF has no pages")
@@ -413,9 +443,9 @@ def _read(path: Path, page: int = 0) -> Sheet:
 @dataclass
 class Scale:
     fmt: str
-    orientation: str        # "portrait" / "landscape"
+    orientation: str  # "portrait" / "landscape"
     px_per_mm: float
-    method: str             # как определён масштаб (пишется в log.txt)
+    method: str  # как определён масштаб (пишется в log.txt)
     candidates: list[str] = field(default_factory=list)
 
 
@@ -448,10 +478,14 @@ def decide_scale(sheet: Sheet, stamp_w_px: float | None) -> Scale:
         # исказила бы нестандартную страницу (250 мм превратились бы в 297 мм).
         ppm = sheet.file_dpi / 25.4
         near = sorted((abs(np.log(c[3] / ppm)), c) for c in cands)
-        fmt, orient = (near[0][1][1], near[0][1][2]) if near and near[0][0] < 0.02 else \
-            ("unknown", "landscape" if w > h else "portrait")
-        how = (f"PDF page size, rendered at {sheet.file_dpi / sheet.upscale:g} dpi "
-               f"(page {w / ppm:.1f} x {h / ppm:.1f} mm)")
+        fmt, orient = (
+            (near[0][1][1], near[0][1][2])
+            if near and near[0][0] < 0.02
+            else ("unknown", "landscape" if w > h else "portrait")
+        )
+        how = (
+            f"PDF page size, rendered at {sheet.file_dpi / sheet.upscale:g} dpi (page {w / ppm:.1f} x {h / ppm:.1f} mm)"
+        )
         if stamp_w_px:
             how += f"; title block {stamp_w_px / ppm:.1f} mm wide (GOST 185)"
         return Scale(fmt, orient, ppm, how, names)
@@ -459,12 +493,21 @@ def decide_scale(sheet: Sheet, stamp_w_px: float | None) -> Scale:
         # пропорции картинки не совпали ни с одним форматом ГОСТ (скан с полями,
         # обрезанный лист): масштаб всё равно даёт штамп
         if stamp_w_px:
-            return Scale("unknown", "landscape" if w > h else "portrait", stamp_w_px / STAMP_W_MM,
-                         f"title block width {stamp_w_px:.0f}px = 185 mm (image aspect {w}x{h} matches no GOST format)",
-                         names)
+            return Scale(
+                "unknown",
+                "landscape" if w > h else "portrait",
+                stamp_w_px / STAMP_W_MM,
+                f"title block width {stamp_w_px:.0f}px = 185 mm (image aspect {w}x{h} matches no GOST format)",
+                names,
+            )
         dpi = sheet.file_dpi or render_dpi() * sheet.upscale
-        return Scale("unknown", "landscape" if w > h else "portrait", dpi / 25.4,
-                     f"no GOST format matches aspect {w}x{h}; assumed {dpi:.0f} dpi", names)
+        return Scale(
+            "unknown",
+            "landscape" if w > h else "portrait",
+            dpi / 25.4,
+            f"no GOST format matches aspect {w}x{h}; assumed {dpi:.0f} dpi",
+            names,
+        )
 
     def pick(target_ppm: float, how: str) -> Scale:
         best = min(cands, key=lambda c: abs(np.log(c[3] / target_ppm)))

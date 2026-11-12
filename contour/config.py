@@ -5,6 +5,7 @@
 Переменная, уже заданная в окружении, важнее файла: так одну настройку можно
 поменять на один запуск, не правя файл.
 """
+
 from __future__ import annotations
 
 import os
@@ -33,9 +34,9 @@ def load_env(path: Path | None) -> list[str]:
         if len(val) >= 2 and val[0] == val[-1] and val[0] in "\"'":
             val = val[1:-1]
         elif val.startswith("#"):
-            val = ""                                    # КЛЮЧ=   # комментарий  (пустое значение)
+            val = ""  # КЛЮЧ=   # комментарий  (пустое значение)
         elif " #" in val:
-            val = val.split(" #", 1)[0].rstrip()       # КЛЮЧ=значение   # комментарий
+            val = val.split(" #", 1)[0].rstrip()  # КЛЮЧ=значение   # комментарий
         if key not in os.environ:
             os.environ[key] = val
             taken.append(key)

@@ -4,6 +4,7 @@
 (3 px). Деталь — прямоугольник 80 x 40 мм с отверстием, левый верхний угол
 в (60, 80) мм от угла листа.
 """
+
 from pathlib import Path
 
 import cv2
@@ -12,7 +13,7 @@ import numpy as np
 DPI = 300
 PPM = DPI / 25.4
 A4 = (210, 297)
-PART = (60, 80, 140, 120)          # x0, y0, x1, y1 в мм
+PART = (60, 80, 140, 120)  # x0, y0, x1, y1 в мм
 
 
 def px(mm: float) -> int:

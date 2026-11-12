@@ -8,6 +8,7 @@
 отрезки, и выбрасывается толстое, что не является контуром (наконечники
 стрелок, жирный текст, знак шероховатости, обозначения разрезов).
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -19,26 +20,27 @@ from .sheet import STAMP_FORMS, STAMP_W_MM, Scale, Sheet, decide_scale
 from .vectorize import Edge, Graph, polyline_segments, simplify, skeleton_graph
 
 # --- пороги (в миллиметрах листа, если не сказано иначе) --------------------
-SPUR_MM = 3.0            # висящая ветка короче этого — заусенец
-ARROW_MAX_MM = 8.0       # висящая ветка короче этого и шире основной линии — наконечник стрелки
-BIG_LEN_MM = 40.0        # кусок с меньшей общей длиной линий — «мелкий» (у букв и надписей ~10–30 мм)
-BIG_SIZE_MM = 15.0       # ... или с меньшим габаритом
-INSIDE_PAD_MM = 2.0      # щели до этого размера заклеиваются при построении силуэта вида
+SPUR_MM = 3.0  # висящая ветка короче этого — заусенец
+ARROW_MAX_MM = 8.0  # висящая ветка короче этого и шире основной линии — наконечник стрелки
+BIG_LEN_MM = 40.0  # кусок с меньшей общей длиной линий — «мелкий» (у букв и надписей ~10–30 мм)
+BIG_SIZE_MM = 15.0  # ... или с меньшим габаритом
+INSIDE_PAD_MM = 2.0  # щели до этого размера заклеиваются при построении силуэта вида
 SMALL_OPEN_KEEP_MM = 15.0  # незамкнутый мелкий кусок внутри вида остаётся, если он не короче этого
-RINGS_MIN_MM = 10.0      # замкнутая фигура (петля есть, хвостов нет) не меньше этого — элемент детали, не текст
-LETTER_MAX_MM = 8.0     # петля с хвостами внутри вида не больше этого — буква
-                         # (буквы на чертеже 5–7 мм; отверстие с прилипшей стрелкой больше)
-TINY_LEN_MM = 1.5        # висящие цепочки короче этого удаляются сразу (шум скелета)
+RINGS_MIN_MM = 10.0  # замкнутая фигура (петля есть, хвостов нет) не меньше этого — элемент детали, не текст
+LETTER_MAX_MM = 8.0  # петля с хвостами внутри вида не больше этого — буква
+# (буквы на чертеже 5–7 мм; отверстие с прилипшей стрелкой больше)
+TINY_LEN_MM = 1.5  # висящие цепочки короче этого удаляются сразу (шум скелета)
 CORNER_W_MM, CORNER_H_MM = 110.0, 35.0  # зона знака шероховатости, правый верхний угол поля
-SIMPLIFY_MM = 0.12       # допуск упрощения Дугласа–Пекера
+SIMPLIFY_MM = 0.12  # допуск упрощения Дугласа–Пекера
 
 
 @dataclass
 class Component:
     """Связный кусок графа: его рёбра, длина, габарит, петли, хвосты и решение."""
+
     edges: list[int]
     length_px: float
-    bbox: tuple[float, float, float, float]   # x0, y0, x1, y1 (пиксели)
+    bbox: tuple[float, float, float, float]  # x0, y0, x1, y1 (пиксели)
     cycles: int
     endpoints: int
     keep: bool = True
@@ -48,6 +50,7 @@ class Component:
 @dataclass
 class Result:
     """Результат листа: масштаб, отрезки контура в пикселях, метрики и лог."""
+
     scale: Scale
     segments_px: list[tuple[float, float, float, float]]
     metrics: dict
@@ -90,9 +93,15 @@ def line_weights(ink: np.ndarray) -> dict:
     thick = float(c[k_best:][int(np.argmax(hi))])
     thr = float(e[k_best])  # левая граница первого «толстого» столбца гистограммы
     separable = thick - thin >= 0.9 and thick / max(thin, 1e-6) >= 1.3
-    return {"dt": dt, "thin_hw": thin, "thick_hw": thick, "thr": thr,
-            "thick_share": round(float(hi.sum()), 3), "separable": separable,
-            "hist": {f"{c[i]:.2f}": round(float(p[i]), 3) for i in range(len(p)) if p[i] >= 0.02}}
+    return {
+        "dt": dt,
+        "thin_hw": thin,
+        "thick_hw": thick,
+        "thr": thr,
+        "thick_share": round(float(hi.sum()), 3),
+        "separable": separable,
+        "hist": {f"{c[i]:.2f}": round(float(p[i]), 3) for i in range(len(p)) if p[i] >= 0.02},
+    }
 
 
 def thick_mask(ink: np.ndarray, dt: np.ndarray, thr: float, thick_hw: float) -> np.ndarray:
@@ -114,7 +123,7 @@ def frame_rect_from_lines(ink: np.ndarray):
     """
     h, w = ink.shape
     k = max(25, int(0.5 * w))
-    soft = cv2.dilate(ink, np.ones((3, 1), np.uint8))           # терпим дрожание линии на 1 пиксель
+    soft = cv2.dilate(ink, np.ones((3, 1), np.uint8))  # терпим дрожание линии на 1 пиксель
     long_h = cv2.morphologyEx(soft, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_RECT, (k, 1)))
     rows = np.nonzero(long_h.any(axis=1))[0]
     # линия обреза листа прижата к краю картинки; линии ближе 1% от края — не рамка
@@ -127,8 +136,8 @@ def frame_rect_from_lines(ink: np.ndarray):
         (t0, t1), (b0, b1) = cl[i], cl[-1 - i]
         if (b0 - t1) < 0.5 * h:
             break
-        top_cols = np.nonzero(long_h[t0:t1 + 1].any(axis=0))[0]
-        bot_cols = np.nonzero(long_h[b0:b1 + 1].any(axis=0))[0]
+        top_cols = np.nonzero(long_h[t0 : t1 + 1].any(axis=0))[0]
+        bot_cols = np.nonzero(long_h[b0 : b1 + 1].any(axis=0))[0]
         top_cols = top_cols[(top_cols > edge) & (top_cols < w - 1 - edge)]
         bot_cols = bot_cols[(bot_cols > edge) & (bot_cols < w - 1 - edge)]
         if len(top_cols) == 0 or len(bot_cols) == 0:
@@ -144,7 +153,7 @@ def frame_from_ink(ink: np.ndarray, rect) -> np.ndarray:
     x0, y0, x1, y1 = rect
     band = np.zeros_like(ink)
     cv2.rectangle(band, (x0, y0), (x1, y1), 1, 5)
-    n, lab = cv2.connectedComponents(ink, connectivity=8)
+    _, lab = cv2.connectedComponents(ink, connectivity=8)
     ids = np.unique(lab[(band > 0) & (ink > 0)])
     ids = ids[ids > 0]
     return np.isin(lab, ids).astype(np.uint8)
@@ -156,10 +165,9 @@ def find_frame(thick: np.ndarray):
     n, lab, st, _ = cv2.connectedComponentsWithStats(thick, connectivity=8)
     best = None
     for i in range(1, n):
-        x, y, bw, bh, area = st[i]
-        if bw >= 0.6 * w and bh >= 0.6 * h:
-            if best is None or bw * bh > st[best][2] * st[best][3]:
-                best = i
+        _, _, bw, bh, _ = st[i]
+        if bw >= 0.6 * w and bh >= 0.6 * h and (best is None or bw * bh > st[best][2] * st[best][3]):
+            best = i
     if best is None:
         return None
     return (lab == best).astype(np.uint8)
@@ -220,7 +228,7 @@ def measure_stamp(frame: np.ndarray):
     xr = (rc[0] + rc[1]) / 2
     yb = (bc[0] + bc[1]) / 2
     y_lo = int(max(0, yb - 0.45 * h))
-    runs = []                       # (y, длина отрезка чернил от правой стороны рамки, высота над нижней стороной)
+    runs = []  # (y, длина отрезка чернил от правой стороны рамки, высота над нижней стороной)
     for y in range(int(bc[0]) - 1, y_lo, -1):
         row = frame[y, : int(rc[0]) + 1][::-1]
         # сплошной отрезок чернил от правой стороны рамки, разрывы до 2 пикселей
@@ -248,8 +256,15 @@ def measure_stamp(frame: np.ndarray):
             if err < 0.12 and (best is None or err < best[0]):
                 best = (err, L, hgt, y)
         if best is not None:
-            return {"w_px": float(best[1]), "h_px": float(best[2]), "top_y": int(best[3]),
-                    "right_x": float(xr), "bottom_y": float(yb), "h_mm": h_mm, "form": form}
+            return {
+                "w_px": float(best[1]),
+                "h_px": float(best[2]),
+                "top_y": int(best[3]),
+                "right_x": float(xr),
+                "bottom_y": float(yb),
+                "h_mm": h_mm,
+                "form": form,
+            }
     return None
 
 
@@ -293,9 +308,15 @@ def _components(g: Graph, alive: list[bool]) -> list[Component]:
         # число петель связного графа: рёбра − узлы + 1 (цепочка с тупиком добавляет условный узел)
         cycles = (len(ids) - len(nodes) - n_dead + 1) if nodes else n_closed
         ends = sum(1 for n in nodes if deg[n] == 1) + sum(1 for i in ids if g.edges[i].b < 0 and not g.edges[i].closed)
-        comps.append(Component(ids, sum(g.edges[i].length for i in ids),
-                               (pts[:, 0].min(), pts[:, 1].min(), pts[:, 0].max(), pts[:, 1].max()),
-                               max(cycles, 0), ends))
+        comps.append(
+            Component(
+                ids,
+                sum(g.edges[i].length for i in ids),
+                (pts[:, 0].min(), pts[:, 1].min(), pts[:, 0].max(), pts[:, 1].max()),
+                max(cycles, 0),
+                ends,
+            )
+        )
     return comps
 
 
@@ -307,8 +328,15 @@ def _main_width(e: Edge, dt: np.ndarray, thr: float) -> bool:
     return float(np.median(dt[ys, xs])) >= thr
 
 
-def prune_spurs(g: Graph, alive: list[bool], max_len: float, rounds: int = 3,
-                dt: np.ndarray | None = None, thr: float = 0.0, keep_len: float = 0.0) -> int:
+def prune_spurs(
+    g: Graph,
+    alive: list[bool],
+    max_len: float,
+    rounds: int = 3,
+    dt: np.ndarray | None = None,
+    thr: float = 0.0,
+    keep_len: float = 0.0,
+) -> int:
     """Удалить короткие висящие ветки (заусенцы, обрубки штриховки).
 
     Ветка меряется от свободного конца через узлы степени 2 до первой
@@ -385,7 +413,7 @@ def prune_arrowheads(g: Graph, alive: list[bool], dt: np.ndarray, thick_hw: floa
                 deg[e.b] += 1
     removed = 0
     wide = 1.3 * thick_hw + 0.5
-    skip = int(np.ceil(2.5 * thick_hw))   # у развилок тоже утолщение: концы цепочки не учитываем
+    skip = int(np.ceil(2.5 * thick_hw))  # у развилок тоже утолщение: концы цепочки не учитываем
     for i, e in enumerate(g.edges):
         if not alive[i] or e.closed or e.length >= max_len:
             continue
@@ -406,8 +434,13 @@ def prune_arrowheads(g: Graph, alive: list[bool], dt: np.ndarray, thick_hw: floa
             # только у конца -> не удаляется.
             n = len(prof)
             idx = np.nonzero(prof >= wide)[0]
-            hit = (n > 2 * skip and len(idx) > 0 and np.median(prof) < wide
-                   and idx.min() > max(skip, 0.2 * n) and idx.max() < min(n - skip, 0.8 * n))
+            hit = (
+                n > 2 * skip
+                and len(idx) > 0
+                and np.median(prof) < wide
+                and idx.min() > max(skip, 0.2 * n)
+                and idx.max() < min(n - skip, 0.8 * n)
+            )
         if hit:
             alive[i] = False
             removed += 1
@@ -468,7 +501,7 @@ def prune_tapered_arrows(g: Graph, alive: list[bool], dt: np.ndarray, thick_hw: 
         n = len(prof)
         if n < 6:
             continue
-        head, tail = prof[: max(2, int(0.35 * n))], prof[int(0.5 * n):]
+        head, tail = prof[: max(2, int(0.35 * n))], prof[int(0.5 * n) :]
         third = max(1, n // 3)
         rising = prof[-third:].mean() >= prof[:third].mean() + 1.0
         if head.min() <= neck and tail.max() >= wide and rising:
@@ -492,11 +525,11 @@ def glyph_boxes(ink: np.ndarray, ppm: float) -> np.ndarray:
     cnt = np.bincount(ids, minlength=n).astype(np.float64)
     cnt[cnt == 0] = 1
     mx, my = np.bincount(ids, xs, n) / cnt, np.bincount(ids, ys, n) / cnt
-    sxx = np.bincount(ids, xs * xs, n) / cnt - mx ** 2
-    syy = np.bincount(ids, ys * ys, n) / cnt - my ** 2
+    sxx = np.bincount(ids, xs * xs, n) / cnt - mx**2
+    syy = np.bincount(ids, ys * ys, n) / cnt - my**2
     sxy = np.bincount(ids, xs * ys, n) / cnt - mx * my
-    tr, det = sxx + syy, sxx * syy - sxy ** 2
-    disc = np.sqrt(np.maximum(tr ** 2 / 4 - det, 0))
+    tr, det = sxx + syy, sxx * syy - sxy**2
+    disc = np.sqrt(np.maximum(tr**2 / 4 - det, 0))
     lmax, lmin = tr / 2 + disc, np.maximum(tr / 2 - disc, 0)
     elong = np.sqrt(lmin / np.maximum(lmax, 1e-9))[1:]
     x, y, bw, bh = st[1:, 0], st[1:, 1], st[1:, 2], st[1:, 3]
@@ -518,8 +551,11 @@ def looks_like_table(g: Graph, c: Component, glyphs: np.ndarray, eps: float) -> 
     if frac < 0.95:
         return False, ""
     x0, y0, x1, y1 = c.bbox
-    inside = ((glyphs[:, 0] >= x0) & (glyphs[:, 1] >= y0) & (glyphs[:, 2] <= x1) & (glyphs[:, 3] <= y1)).sum() \
-        if len(glyphs) else 0
+    inside = (
+        ((glyphs[:, 0] >= x0) & (glyphs[:, 1] >= y0) & (glyphs[:, 2] <= x1) & (glyphs[:, 3] <= y1)).sum()
+        if len(glyphs)
+        else 0
+    )
     if inside >= 15:
         return True, f"table: {frac * 100:.0f}% axis-aligned, {c.cycles} cells, {int(inside)} text glyphs inside"
     return False, ""
@@ -529,7 +565,7 @@ def _interior_mask(g: Graph, comps: list[Component], shape, ppm: float):
     """Залитые силуэты крупных кусков (отверстия залиты) на сетке с шагом q
     пикселей. Нужны, чтобы отличить элементы внутри вида (отверстия) от
     пометок рядом с ним (обозначения разрезов, буквы)."""
-    q = max(1, int(round(ppm / 4)))          # ячейки примерно 0,25 мм
+    q = max(1, int(round(ppm / 4)))  # ячейки примерно 0,25 мм
     h, w = shape[0] // q + 1, shape[1] // q + 1
     m = np.zeros((h, w), np.uint8)
     for c in comps:
@@ -549,7 +585,7 @@ def _interior_mask(g: Graph, comps: list[Component], shape, ppm: float):
 
 
 # ---------------------------------------------------------------------------
-UPSAMPLE_BELOW_HW = 2.5   # при основной полуширине (px) не больше этой работаем в 2× увеличении
+UPSAMPLE_BELOW_HW = 2.5  # при основной полуширине (px) не больше этой работаем в 2× увеличении
 
 
 def extract(sheet: Sheet) -> Result:
@@ -573,16 +609,24 @@ def extract(sheet: Sheet) -> Result:
         gray = cv2.resize(sheet.gray, None, fx=f, fy=f, interpolation=cv2.INTER_CUBIC)
         ink, t = binarize(gray)
         lw = line_weights(ink)
-    work = Sheet(sheet.path, gray, sheet.source, sheet.pages,
-                 sheet.file_dpi * f if sheet.file_dpi else None, upscale=f,
-                 geometry_changed=sheet.geometry_changed)
+    work = Sheet(
+        sheet.path,
+        gray,
+        sheet.source,
+        sheet.pages,
+        sheet.file_dpi * f if sheet.file_dpi else None,
+        upscale=f,
+        geometry_changed=sheet.geometry_changed,
+    )
     res = _extract_work(work, ink, lw, log)
     if f != 1:
-        res.segments_px = [tuple(v / f for v in s) for s in res.segments_px]
-        res.dropped_segments_px = [tuple(v / f for v in s) for s in res.dropped_segments_px]
+        res.segments_px = [(s[0] / f, s[1] / f, s[2] / f, s[3] / f) for s in res.segments_px]
+        res.dropped_segments_px = [(s[0] / f, s[1] / f, s[2] / f, s[3] / f) for s in res.dropped_segments_px]
         res.scale.px_per_mm /= f
         res.metrics["px_per_mm"] = round(res.scale.px_per_mm, 4)
-        res.field_bbox = tuple(int(v / f) for v in res.field_bbox)
+        if res.field_bbox is not None:
+            x, y, w, h = res.field_bbox
+            res.field_bbox = (int(x / f), int(y / f), int(w / f), int(h / f))
     res.metrics["work_scale"] = f
     res.frame_mask = None
     return res
@@ -592,9 +636,11 @@ def _extract_work(sheet: Sheet, ink: np.ndarray, lw: dict, log: list[str]) -> Re
     """Всё построение контура на рабочей картинке: рамка и масштаб, скелет, чистка графа, решение по кускам, метрики."""
     gray = sheet.gray
     H, W = gray.shape
-    log.append(f"line weights: thin half-width {lw['thin_hw']:.2f}px, thick {lw['thick_hw']:.2f}px, "
-               f"threshold {lw['thr']:.2f}px, thick share {lw['thick_share']}, separable={lw['separable']}; "
-               f"histogram {lw['hist']}")
+    log.append(
+        f"line weights: thin half-width {lw['thin_hw']:.2f}px, thick {lw['thick_hw']:.2f}px, "
+        f"threshold {lw['thr']:.2f}px, thick share {lw['thick_share']}, separable={lw['separable']}; "
+        f"histogram {lw['hist']}"
+    )
     thick = thick_mask(ink, lw["dt"], lw["thr"], lw["thick_hw"])
     log.append(f"thick strokes: {int(thick.sum())} px ({thick.sum() / max(ink.sum(), 1) * 100:.0f}% of ink)")
 
@@ -603,16 +649,18 @@ def _extract_work(sheet: Sheet, ink: np.ndarray, lw: dict, log: list[str]) -> Re
     if rects:
         # рамка — прямоугольник, к которому пристыкован штамп; если штампа нет
         # ни у одного — внешний
-        for k, rect in enumerate(rects):
-            cand = frame_from_ink(ink, rect)
-            if k == 0:
-                frame, chosen = cand, rect
-            if len(rects) == 1 or measure_stamp(cand) is not None:
-                frame, chosen = cand, rect
-                break
+        frame, chosen = frame_from_ink(ink, rects[0]), rects[0]
+        if len(rects) > 1:
+            for k, rect in enumerate(rects):
+                cand = frame if k == 0 else frame_from_ink(ink, rect)
+                if measure_stamp(cand) is not None:
+                    frame, chosen = cand, rect
+                    break
         rect = chosen
-        log.append(f"frame: rectangle from long lines x={rect[0]}..{rect[2]} y={rect[1]}..{rect[3]} px "
-                   f"({len(rects)} nested candidate(s)); attached ink (title block, boxes) {int(frame.sum())} px")
+        log.append(
+            f"frame: rectangle from long lines x={rect[0]}..{rect[2]} y={rect[1]}..{rect[3]} px "
+            f"({len(rects)} nested candidate(s)); attached ink (title block, boxes) {int(frame.sum())} px"
+        )
     else:
         frame = find_frame(thick)
         if frame is not None:
@@ -625,19 +673,30 @@ def _extract_work(sheet: Sheet, ink: np.ndarray, lw: dict, log: list[str]) -> Re
         x, y, bw, bh = cv2.boundingRect(frame)
         log.append(f"frame: bbox x={x} y={y} w={bw} h={bh} px (with attached title block/boxes)")
         stamp = measure_stamp(frame)
-        log.append("title block: " + (f"{stamp['w_px']:.0f}x{stamp['h_px']:.0f} px" if stamp else "NOT measured")
-                   + (f", GOST 2.104 {stamp['form']} (185 x {stamp['h_mm']:g} mm)"
-                      if stamp and stamp["form"] != "form 1" else ""))
+        log.append(
+            "title block: "
+            + (f"{stamp['w_px']:.0f}x{stamp['h_px']:.0f} px" if stamp else "NOT measured")
+            + (
+                f", GOST 2.104 {stamp['form']} (185 x {stamp['h_mm']:g} mm)"
+                if stamp and stamp["form"] != "form 1"
+                else ""
+            )
+        )
         fieldm = drawing_field(frame)
-        log.append("drawing field: " + ("enclosed region found" if fieldm is not None else "NOT enclosed, using frame bbox"))
+        log.append(
+            "drawing field: " + ("enclosed region found" if fieldm is not None else "NOT enclosed, using frame bbox")
+        )
 
     scale = decide_scale(sheet, stamp["w_px"] if stamp else None)
     ppm = scale.px_per_mm
-    log.append(f"format: {scale.fmt} {scale.orientation}, {ppm:.3f} px/mm ({ppm * 25.4:.0f} dpi) "
-               f"via {scale.method}; aspect candidates {scale.candidates}")
+    log.append(
+        f"format: {scale.fmt} {scale.orientation}, {ppm:.3f} px/mm ({ppm * 25.4:.0f} dpi) "
+        f"via {scale.method}; aspect candidates {scale.candidates}"
+    )
     if stamp:
-        log.append(f"title block in mm: {stamp['w_px'] / ppm:.1f} x {stamp['h_px'] / ppm:.1f} "
-                   f"(GOST 185 x {stamp['h_mm']:g})")
+        log.append(
+            f"title block in mm: {stamp['w_px'] / ppm:.1f} x {stamp['h_px'] / ppm:.1f} (GOST 185 x {stamp['h_mm']:g})"
+        )
 
     # остаются только толстые штрихи внутри поля чертежа
     if frame is not None:
@@ -647,7 +706,7 @@ def _extract_work(sheet: Sheet, ink: np.ndarray, lw: dict, log: list[str]) -> Re
             x, y, bw, bh = cv2.boundingRect(frame)
             keep = np.zeros_like(thick)
             m = int(2 * ppm)
-            keep[y + m:y + bh - m, x + m:x + bw - m] = 1
+            keep[y + m : y + bh - m, x + m : x + bw - m] = 1
         part = thick & keep & (1 - frame)
     else:
         m = int(10 * ppm)
@@ -656,8 +715,12 @@ def _extract_work(sheet: Sheet, ink: np.ndarray, lw: dict, log: list[str]) -> Re
         part[-m:] = 0
         part[:, :m] = 0
         part[:, -m:] = 0
-    field_bbox = cv2.boundingRect(fieldm) if fieldm is not None else (
-        cv2.boundingRect(frame) if frame is not None else (0, 0, W, H))
+    bx = (
+        cv2.boundingRect(fieldm)
+        if fieldm is not None
+        else (cv2.boundingRect(frame) if frame is not None else (0, 0, W, H))
+    )
+    field_bbox = (int(bx[0]), int(bx[1]), int(bx[2]), int(bx[3]))
 
     skel = cv2.ximgproc.thinning(part * 255) > 0
     g = skeleton_graph(skel)
@@ -670,32 +733,34 @@ def _extract_work(sheet: Sheet, ink: np.ndarray, lw: dict, log: list[str]) -> Re
             alive[i] = False
             n_tiny += 1
     n_arrow = prune_arrowheads(g, alive, lw["dt"], lw["thick_hw"], ARROW_MAX_MM * ppm)
-    n_spur = prune_spurs(g, alive, SPUR_MM * ppm, dt=lw["dt"], thr=0.85 * lw["thick_hw"],
-                         keep_len=1.0 * ppm)
+    n_spur = prune_spurs(g, alive, SPUR_MM * ppm, dt=lw["dt"], thr=0.85 * lw["thick_hw"], keep_len=1.0 * ppm)
     # крупность куска решается, пока стрелки ещё на месте: маленький выносной
     # вид теряет на следующем шаге свои стрелки и не должен из-за этого
     # опуститься ниже порога «крупного куска»
     pre_big_edges: set = set()
     for c in _components(g, alive):
-        if c.length_px >= BIG_LEN_MM * ppm and \
-                max(c.bbox[2] - c.bbox[0], c.bbox[3] - c.bbox[1]) >= BIG_SIZE_MM * ppm:
+        if c.length_px >= BIG_LEN_MM * ppm and max(c.bbox[2] - c.bbox[0], c.bbox[3] - c.bbox[1]) >= BIG_SIZE_MM * ppm:
             pre_big_edges.update(c.edges)
     n_taper = prune_tapered_arrows(g, alive, lw["dt"], lw["thick_hw"], ARROW_MAX_MM * ppm)
     if n_taper:
         # на развилке, где висела стрелка, может остаться короткий заусенец
-        n_spur += prune_spurs(g, alive, SPUR_MM * ppm, dt=lw["dt"], thr=0.85 * lw["thick_hw"],
-                              keep_len=1.0 * ppm)
-    log.append(f"pruned: {n_tiny} tiny chains (<{TINY_LEN_MM} mm), {n_arrow} arrowheads, "
-               f"{n_taper} arrowheads tapering off the outline, {n_spur} dangling spurs (<{SPUR_MM} mm)")
+        n_spur += prune_spurs(g, alive, SPUR_MM * ppm, dt=lw["dt"], thr=0.85 * lw["thick_hw"], keep_len=1.0 * ppm)
+    log.append(
+        f"pruned: {n_tiny} tiny chains (<{TINY_LEN_MM} mm), {n_arrow} arrowheads, "
+        f"{n_taper} arrowheads tapering off the outline, {n_spur} dangling spurs (<{SPUR_MM} mm)"
+    )
 
     comps = _components(g, alive)
     fx, fy, fw, fh = field_bbox
-    big = [c for c in comps
-           if (c.length_px >= BIG_LEN_MM * ppm and max(c.bbox[2] - c.bbox[0], c.bbox[3] - c.bbox[1]) >= BIG_SIZE_MM * ppm)
-           or any(i in pre_big_edges for i in c.edges)]
+    big = [
+        c
+        for c in comps
+        if (c.length_px >= BIG_LEN_MM * ppm and max(c.bbox[2] - c.bbox[0], c.bbox[3] - c.bbox[1]) >= BIG_SIZE_MM * ppm)
+        or any(i in pre_big_edges for i in c.edges)
+    ]
     # знак шероховатости в правом верхнем углу поля (ГОСТ 2.309)
     for c in big:
-        in_corner = (c.bbox[0] >= fx + fw - CORNER_W_MM * ppm and c.bbox[3] <= fy + CORNER_H_MM * ppm)
+        in_corner = c.bbox[0] >= fx + fw - CORNER_W_MM * ppm and c.bbox[3] <= fy + CORNER_H_MM * ppm
         if in_corner and c.cycles == 0:
             c.keep, c.reason = False, "roughness sign zone (top-right corner)"
     glyphs = glyph_boxes(ink, ppm)
@@ -741,8 +806,11 @@ def _extract_work(sheet: Sheet, ink: np.ndarray, lw: dict, log: list[str]) -> Re
 
     def _desc(c: Component) -> str:
         x0, y0, x1, y1 = (v / ppm for v in c.bbox)
-        return (f"bbox mm ({x0:.0f},{y0:.0f})-({x1:.0f},{y1:.0f}) len {c.length_px / ppm:.0f} mm, "
-                f"loops {c.cycles}, open ends {c.endpoints}")
+        return (
+            f"bbox mm ({x0:.0f},{y0:.0f})-({x1:.0f},{y1:.0f}) len {c.length_px / ppm:.0f} mm, "
+            f"loops {c.cycles}, open ends {c.endpoints}"
+        )
+
     for c in sorted(kept, key=lambda c: -c.length_px):
         log.append(f"  kept: {_desc(c)}" + (f" [{c.reason}]" if c.reason else " [large]"))
     for c in sorted(dropped, key=lambda c: -c.length_px)[:8]:
@@ -762,8 +830,10 @@ def _extract_work(sheet: Sheet, ink: np.ndarray, lw: dict, log: list[str]) -> Re
     cycles = sum(c.cycles for c in kept)
     ends = sum(c.endpoints for c in kept)
     if kept:
-        x0 = min(c.bbox[0] for c in kept); y0 = min(c.bbox[1] for c in kept)
-        x1 = max(c.bbox[2] for c in kept); y1 = max(c.bbox[3] for c in kept)
+        x0 = min(c.bbox[0] for c in kept)
+        y0 = min(c.bbox[1] for c in kept)
+        x1 = max(c.bbox[2] for c in kept)
+        y1 = max(c.bbox[3] for c in kept)
         bbox_mm = [round(v / ppm, 1) for v in (x0, y0, x1, y1)]
         area_frac = (x1 - x0) * (y1 - y0) / max(fw * fh, 1)
     else:
@@ -773,32 +843,48 @@ def _extract_work(sheet: Sheet, ink: np.ndarray, lw: dict, log: list[str]) -> Re
     if part.sum() > 0 and segs:
         m = np.zeros_like(part)
         for x1_, y1_, x2_, y2_ in segs:
-            cv2.line(m, (int(round(x1_)), int(round(y1_))), (int(round(x2_)), int(round(y2_))), 1,
-                     max(3, int(2 * lw["thick_hw"] + 3)))
+            cv2.line(
+                m,
+                (int(round(x1_)), int(round(y1_))),
+                (int(round(x2_)), int(round(y2_))),
+                1,
+                max(3, int(2 * lw["thick_hw"] + 3)),
+            )
         cov = float((part & m).sum() / part.sum())
 
     metrics = {
         "image_px": [W, H],
-        "format": scale.fmt, "orientation": scale.orientation,
-        "px_per_mm": round(ppm, 4), "scale_method": scale.method,
-        "line_weight_thin_hw_px": lw["thin_hw"], "line_weight_thick_hw_px": lw["thick_hw"],
+        "format": scale.fmt,
+        "orientation": scale.orientation,
+        "px_per_mm": round(ppm, 4),
+        "scale_method": scale.method,
+        "line_weight_thin_hw_px": lw["thin_hw"],
+        "line_weight_thick_hw_px": lw["thick_hw"],
         "line_weights_separable": lw["separable"],
         "thick_share": lw["thick_share"],
         "field_bbox_mm": [round(v / ppm, 1) for v in (fx, fy, fx + fw, fy + fh)],
-        "frame_found": frame is not None, "title_block_found": stamp is not None,
+        "frame_found": frame is not None,
+        "title_block_found": stamp is not None,
         "field_enclosed": fieldm is not None,
-        "segments": len(segs), "dropped_segments": len(dsegs),
-        "components_kept": len(kept), "components_dropped": len(dropped),
+        "segments": len(segs),
+        "dropped_segments": len(dsegs),
+        "components_kept": len(kept),
+        "components_dropped": len(dropped),
         "drop_reasons": reasons,
         "contour_length_mm": round(total_len, 1),
-        "closed_loops": cycles, "open_ends": ends,
-        "contour_bbox_mm": bbox_mm, "contour_bbox_field_fraction": round(area_frac, 3),
+        "closed_loops": cycles,
+        "open_ends": ends,
+        "contour_bbox_mm": bbox_mm,
+        "contour_bbox_field_fraction": round(area_frac, 3),
         "thick_ink_covered": round(cov, 3),
-        "largest_dropped_mm": round(max((c.length_px for c in dropped
-                                         if not c.reason.startswith(("roughness", "table"))), default=0) / ppm, 1),
+        "largest_dropped_mm": round(
+            max((c.length_px for c in dropped if not c.reason.startswith(("roughness", "table"))), default=0) / ppm, 1
+        ),
         "tables_removed": sum(1 for c in dropped if c.reason.startswith("table")),
         "largest_kept_mm": round(max((c.length_px for c in kept), default=0) / ppm, 1),
     }
-    log.append(f"result: {len(segs)} segments, length {total_len:.0f} mm, closed loops {cycles}, "
-               f"open ends {ends}, thick ink in field covered {cov * 100:.0f}%")
+    log.append(
+        f"result: {len(segs)} segments, length {total_len:.0f} mm, closed loops {cycles}, "
+        f"open ends {ends}, thick ink in field covered {cov * 100:.0f}%"
+    )
     return Result(scale, segs, metrics, log, frame, field_bbox, dsegs)

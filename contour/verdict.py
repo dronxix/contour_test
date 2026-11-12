@@ -31,6 +31,7 @@
 Если вердикт не получен, лист получает yellow: непроверенный контур —
 сомнительный контур, green он не бывает.
 """
+
 from __future__ import annotations
 
 import base64
@@ -53,7 +54,7 @@ DEFAULT_PROMPT_FILE = "prompts/verdict_system.txt"
 class Verdict:
     verdict: str
     reason: str
-    source: str                       # "model" / "program: ..." — кто поставил вердикт
+    source: str  # "model" / "program: ..." — кто поставил вердикт
     notes: list[str] = field(default_factory=list)
     model_request: str | None = None
     model_response: str | None = None
@@ -144,8 +145,10 @@ def program_notes(m: dict) -> tuple[str | None, list[str]]:
     if not m.get("line_weights_separable", True):
         notes.append("толщины основных и тонких линий на листе плохо разделяются, в контур мог попасть мусор")
     elif m.get("thick_share", 0) > 0.6:
-        notes.append(f"толстыми признаны {m['thick_share'] * 100:.0f}% всех линий листа (обычно 20-50%): "
-                     "размеры и текст могли попасть в контур")
+        notes.append(
+            f"толстыми признаны {m['thick_share'] * 100:.0f}% всех линий листа (обычно 20-50%): "
+            "размеры и текст могли попасть в контур"
+        )
     if not m.get("frame_found", True):
         notes.append("рамка не найдена, штамп и надписи могли попасть в контур")
     elif not m.get("title_block_found", True):
@@ -155,12 +158,16 @@ def program_notes(m: dict) -> tuple[str | None, list[str]]:
     if m.get("open_ends", 0) > max(6, 0.6 * max(m.get("closed_loops", 0), 1) + 4):
         notes.append(f"много оборванных концов линий ({m['open_ends']}): контур разорван или есть лишние штрихи")
     if m.get("largest_dropped_mm", 0) >= 30:
-        notes.append(f"программа выбросила крупный кусок толстых линий ({m['largest_dropped_mm']:.0f} мм): "
-                     "возможно, это выносной элемент или вид детали, который не обведён")
+        notes.append(
+            f"программа выбросила крупный кусок толстых линий ({m['largest_dropped_mm']:.0f} мм): "
+            "возможно, это выносной элемент или вид детали, который не обведён"
+        )
     if m.get("components_kept", 0) > 25:
         notes.append(f"контур раздроблен на {m['components_kept']} кусков, могли попасть текст или значки")
     if m.get("tables_removed", 0):
-        notes.append(f"на листе есть таблица ({m['tables_removed']} шт.), программа её выбросила; проверь, что её линии не малиновые")
+        notes.append(
+            f"на листе есть таблица ({m['tables_removed']} шт.), программа её выбросила; проверь, что её линии не малиновые"
+        )
     return None, notes
 
 
@@ -172,12 +179,22 @@ def system_prompt() -> str:
     return text
 
 
-PROMPT_METRICS = ("format", "segments", "contour_length_mm", "components_kept", "closed_loops", "open_ends",
-                  "largest_dropped_mm", "tables_removed", "thick_share")
+PROMPT_METRICS = (
+    "format",
+    "segments",
+    "contour_length_mm",
+    "components_kept",
+    "closed_loops",
+    "open_ends",
+    "largest_dropped_mm",
+    "tables_removed",
+    "thick_share",
+)
 
 
 class ModelError(Exception):
     """Модель не ответила; request — что было отправлено (для log.txt)."""
+
     def __init__(self, msg: str, request: str):
         super().__init__(msg)
         self.request = request
@@ -188,12 +205,18 @@ def build_request_text(metrics: dict, notes: list[str], n_zoom: int = 0) -> str:
     short = {k: metrics[k] for k in PROMPT_METRICS if k in metrics}
     pics = "Картинка 1 — весь лист."
     if n_zoom:
-        pics += (f" Картинки 2–{n_zoom + 1} — крупные планы видов детали с того же листа "
-                 "(контур тоже малиновый): по ним проверяй стрелки, буквы и мелкие элементы.")
-    return (pics +
-            "\nЗаметки программы (подсказки, не вердикт): " + ("; ".join(notes) or "нет") +
-            "\nМетрики программы: " + json.dumps(short, ensure_ascii=False) +
-            "\nПосмотри на картинки и дай вердикт.")
+        pics += (
+            f" Картинки 2–{n_zoom + 1} — крупные планы видов детали с того же листа "
+            "(контур тоже малиновый): по ним проверяй стрелки, буквы и мелкие элементы."
+        )
+    return (
+        pics
+        + "\nЗаметки программы (подсказки, не вердикт): "
+        + ("; ".join(notes) or "нет")
+        + "\nМетрики программы: "
+        + json.dumps(short, ensure_ascii=False)
+        + "\nПосмотри на картинки и дай вердикт."
+    )
 
 
 def _sha(data: bytes) -> str:
@@ -207,11 +230,19 @@ def verdict_fingerprint() -> dict:
     md = mode()
     fp: dict = {"mode": md}
     if md == "model":
-        fp.update(api_type=api_type(), model=setting("VERDICT_MODEL"), api_base=api_base(),
-                  reasoning=setting("VERDICT_REASONING", "none"), max_tokens=max_tokens(),
-                  prompt_sha1=_sha(system_prompt().encode()), image_px=image_px(),
-                  zoom=setting("VERDICT_ZOOM", "auto"), zoom_px=zoom_px(), zoom_max=zoom_max(),
-                  zoom_min_ppm=setting("VERDICT_ZOOM_MIN_PX_PER_MM", "5"))
+        fp.update(
+            api_type=api_type(),
+            model=setting("VERDICT_MODEL"),
+            api_base=api_base(),
+            reasoning=setting("VERDICT_REASONING", "none"),
+            max_tokens=max_tokens(),
+            prompt_sha1=_sha(system_prompt().encode()),
+            image_px=image_px(),
+            zoom=setting("VERDICT_ZOOM", "auto"),
+            zoom_px=zoom_px(),
+            zoom_max=zoom_max(),
+            zoom_min_ppm=setting("VERDICT_ZOOM_MIN_PX_PER_MM", "5"),
+        )
     elif md == "review":
         p = resolve(setting("VERDICT_REVIEW_FILE"))
         fp["review_sha1"] = _sha(p.read_bytes()) if p.exists() else None
@@ -220,7 +251,7 @@ def verdict_fingerprint() -> dict:
 
 API_TYPES = ("openai", "anthropic", "gemini")
 DEFAULT_BASE = {
-    "openai": "http://localhost:1234/v1",            # LM Studio; для OpenAI: https://api.openai.com/v1
+    "openai": "http://localhost:1234/v1",  # LM Studio; для OpenAI: https://api.openai.com/v1
     "anthropic": "https://api.anthropic.com",
     "gemini": "https://generativelanguage.googleapis.com",
 }
@@ -251,38 +282,67 @@ def _request_log(url: str, sysp: str, user_text: str, images: list[Path], body: 
     (картинки названы по имени и SHA-1, сами файлы лежат рядом с логом)."""
     params = {k: v for k, v in body.items() if k not in _HEAVY}
     imgs = [f"  {p.name}  sha1 {_sha(p.read_bytes())[:12]}" for p in images]
-    return "\n".join([f"api: {api_type()}", f"endpoint: {url}",
-                      f"parameters: {json.dumps(params, ensure_ascii=False)}",
-                      f"system prompt ({setting('VERDICT_PROMPT_FILE', DEFAULT_PROMPT_FILE)}, "
-                      f"sha1 {_sha(sysp.encode())[:12]}):", sysp, "", "user text:", user_text, "",
-                      f"images ({len(images)}):", *imgs])
+    return "\n".join(
+        [
+            f"api: {api_type()}",
+            f"endpoint: {url}",
+            f"parameters: {json.dumps(params, ensure_ascii=False)}",
+            (
+                f"system prompt ({setting('VERDICT_PROMPT_FILE', DEFAULT_PROMPT_FILE)}, "
+                f"sha1 {_sha(sysp.encode())[:12]}):"
+            ),
+            sysp,
+            "",
+            "user text:",
+            user_text,
+            "",
+            f"images ({len(images)}):",
+            *imgs,
+        ]
+    )
 
 
-def _build_request(kind: str, base: str, model: str, key: str, sysp: str, user_text: str,
-                   images_b64: list[str]) -> tuple[str, dict, dict]:
+def _build_request(
+    kind: str, base: str, model: str, key: str, sysp: str, user_text: str, images_b64: list[str]
+) -> tuple[str, dict, dict]:
     """(адрес, заголовки, тело) в формате выбранного API. Содержание у всех
     одно: системный промпт, текст, картинки (PNG), temperature 0."""
     reasoning = setting("VERDICT_REASONING", "none")
     if kind == "anthropic":
-        content = [{"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": b}}
-                   for b in images_b64] + [{"type": "text", "text": user_text}]
-        body = {"model": model, "max_tokens": max_tokens(), "temperature": 0, "system": sysp,
-                "messages": [{"role": "user", "content": content}]}
+        content = [
+            {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": b}} for b in images_b64
+        ] + [{"type": "text", "text": user_text}]
+        body = {
+            "model": model,
+            "max_tokens": max_tokens(),
+            "temperature": 0,
+            "system": sysp,
+            "messages": [{"role": "user", "content": content}],
+        }
         headers = {"x-api-key": key, "anthropic-version": ANTHROPIC_VERSION}
         return f"{base}/v1/messages", headers, body
     if kind == "gemini":
         parts = [{"text": user_text}] + [{"inline_data": {"mime_type": "image/png", "data": b}} for b in images_b64]
         gen: dict = {"temperature": 0, "maxOutputTokens": max_tokens()}
         if reasoning == "none":
-            gen["thinkingConfig"] = {"thinkingBudget": 0}     # сразу отвечать, без «размышлений»
-        body = {"systemInstruction": {"parts": [{"text": sysp}]},
-                "contents": [{"role": "user", "parts": parts}], "generationConfig": gen}
+            gen["thinkingConfig"] = {"thinkingBudget": 0}  # сразу отвечать, без «размышлений»
+        body = {
+            "systemInstruction": {"parts": [{"text": sysp}]},
+            "contents": [{"role": "user", "parts": parts}],
+            "generationConfig": gen,
+        }
         headers = {"x-goog-api-key": key}
         return f"{base}/v1beta/models/{model}:generateContent", headers, body
     content = [{"type": "text", "text": user_text}] + [
-        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b}"}} for b in images_b64]
-    body = {"model": model, "temperature": 0, "seed": 0, "max_tokens": max_tokens(),
-            "messages": [{"role": "system", "content": sysp}, {"role": "user", "content": content}]}
+        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b}"}} for b in images_b64
+    ]
+    body = {
+        "model": model,
+        "temperature": 0,
+        "seed": 0,
+        "max_tokens": max_tokens(),
+        "messages": [{"role": "system", "content": sysp}, {"role": "user", "content": content}],
+    }
     # «думающая» модель может потратить весь лимит на скрытые рассуждения, а нужен короткий вердикт
     if reasoning:
         body["reasoning_effort"] = reasoning
@@ -296,8 +356,9 @@ def _answer_text(kind: str, resp: dict) -> str:
         return "".join(b.get("text", "") for b in resp.get("content", []) if b.get("type") == "text")
     if kind == "gemini":
         cands = resp.get("candidates") or [{}]
-        return "".join(p.get("text", "") for p in (cands[0].get("content") or {}).get("parts", [])
-                       if not p.get("thought"))
+        return "".join(
+            p.get("text", "") for p in (cands[0].get("content") or {}).get("parts", []) if not p.get("thought")
+        )
     return resp["choices"][0]["message"].get("content") or ""
 
 
@@ -341,7 +402,7 @@ def _model_call(images: list[Path], metrics: dict, notes: list[str]) -> tuple[st
                 continue
             if e.code in (429, 500, 502, 503, 504, 529) and busy_retries < 3:
                 busy_retries += 1
-                time.sleep(5 * busy_retries)          # лимит запросов или перегрузка: подождать и повторить
+                time.sleep(5 * busy_retries)  # лимит запросов или перегрузка: подождать и повторить
                 continue
             raise ModelError(f"HTTP {e.code}: {detail[:300]}", logged) from e
         except Exception as e:
@@ -373,7 +434,7 @@ def _adapt_body(kind: str, body: dict, detail: str) -> str | None:
                 return f"{p} not supported, dropped"
         return None
     if kind == "anthropic":
-        if "temperature" in body and "temperature" in msg:      # max_tokens там обязателен, его не убираем
+        if "temperature" in body and "temperature" in msg:  # max_tokens там обязателен, его не убираем
             body.pop("temperature")
             return "temperature not supported, dropped"
         return None
@@ -396,7 +457,7 @@ def _has_reason(reason: str) -> bool:
 def _parse(text: str) -> tuple[str, str] | None:
     """(вердикт, причина) или None. Ответ без причины не принимается: лист
     тогда остаётся yellow, это безопасная сторона."""
-    m = re.search(r"\{.*\}", text, re.S)
+    m = re.search(r"\{.*\}", text, re.DOTALL)
     if m:
         try:
             d = json.loads(m.group(0))
@@ -438,45 +499,71 @@ def _load_review(path: str) -> dict:
     return _REVIEW_CACHE[path]
 
 
-def _review_verdict(rel: str | None, csha: str | None, metrics: dict, notes: list[str],
-                    src_sha: str | None = None) -> Verdict:
+def _review_verdict(
+    rel: str | None, csha: str | None, metrics: dict, notes: list[str], src_sha: str | None = None
+) -> Verdict:
     """Вердикт из файла ревью; применяется, только если совпали отпечатки контура и файла чертежа."""
     path = setting("VERDICT_REVIEW_FILE")
     req = build_request_text(metrics, notes)
     if not path:
-        return _no_model("вердикт модели не получен (файл ревью не задан), контур не проверен",
-                         notes, "program: VERDICT_MODE=review but VERDICT_REVIEW_FILE is empty")
+        return _no_model(
+            "вердикт модели не получен (файл ревью не задан), контур не проверен",
+            notes,
+            "program: VERDICT_MODE=review but VERDICT_REVIEW_FILE is empty",
+        )
     try:
         data = _load_review(path)
     except Exception as e:
-        return _no_model("вердикт модели не получен (файл ревью не прочитан), контур не проверен",
-                         notes, f"program: review file error: {type(e).__name__}: {e}")
+        return _no_model(
+            "вердикт модели не получен (файл ревью не прочитан), контур не проверен",
+            notes,
+            f"program: review file error: {type(e).__name__}: {e}",
+        )
     reviewer = data.get("reviewer", "reviewer")
     item = data.get("items", {}).get(rel or "")
     if not item:
-        return _no_model("вердикт модели не получен (лист не проходил ревью), контур не проверен",
-                         notes, f"program: no review for this file in {path}")
+        return _no_model(
+            "вердикт модели не получен (лист не проходил ревью), контур не проверен",
+            notes,
+            f"program: no review for this file in {path}",
+        )
     if item.get("contour_sha1") != csha:
-        return _no_model("вердикт модели не получен (ревью было для другого контура), контур не проверен",
-                         notes, f"program: review is for contour {item.get('contour_sha1')}, current is {csha}")
+        return _no_model(
+            "вердикт модели не получен (ревью было для другого контура), контур не проверен",
+            notes,
+            f"program: review is for contour {item.get('contour_sha1')}, current is {csha}",
+        )
     # ревьюер смотрел именно этот чертёж; тот же контур на изменённом чертеже
     # (например, дорисован вид тонкими линиями) — уже не то, что проверялось
     if "source_sha1" not in item:
-        return _no_model("вердикт модели не получен (ревью не привязано к файлу чертежа), контур не проверен",
-                         notes, "program: review item has no source_sha1")
+        return _no_model(
+            "вердикт модели не получен (ревью не привязано к файлу чертежа), контур не проверен",
+            notes,
+            "program: review item has no source_sha1",
+        )
     if item["source_sha1"] != src_sha:
-        return _no_model("вердикт модели не получен (ревью было для другой версии чертежа), контур не проверен",
-                         notes, f"program: review is for file {item['source_sha1']}, current is {src_sha}")
+        return _no_model(
+            "вердикт модели не получен (ревью было для другой версии чертежа), контур не проверен",
+            notes,
+            f"program: review is for file {item['source_sha1']}, current is {src_sha}",
+        )
     v = str(item.get("verdict", "")).lower()
     if v not in VERDICTS:
         return _no_model("ответ ревьюера не разобран, контур не проверен", notes, "program: bad review item")
     resp = json.dumps({"verdict": v, "reason": item.get("reason", "")}, ensure_ascii=False)
-    return Verdict(v, item.get("reason", ""), f"model: {reviewer} (offline review file, not a live API call)",
-                   notes, f"[same request as for a live model; image = overlay of this contour]\n{req}", resp)
+    return Verdict(
+        v,
+        item.get("reason", ""),
+        f"model: {reviewer} (offline review file, not a live API call)",
+        notes,
+        f"[same request as for a live model; image = overlay of this contour]\n{req}",
+        resp,
+    )
 
 
-def decide(metrics: dict, images: list[Path], rel: str | None = None, csha: str | None = None,
-           src_sha: str | None = None) -> Verdict:
+def decide(
+    metrics: dict, images: list[Path], rel: str | None = None, csha: str | None = None, src_sha: str | None = None
+) -> Verdict:
     """Вердикт листа. images: сначала картинка всего листа, потом крупные планы
     видов (может не быть). csha / src_sha: отпечатки контура и файла чертежа."""
     fatal, notes = program_notes(metrics)
@@ -486,16 +573,29 @@ def decide(metrics: dict, images: list[Path], rel: str | None = None, csha: str 
     if md == "review":
         return _review_verdict(rel, csha, metrics, notes, src_sha)
     if md == "off" or not images:
-        return _no_model("вердикт модели не получен (модель не настроена), контур не проверен",
-                         notes, "program: no model configured (VERDICT_MODE=off or VERDICT_MODEL empty)")
+        return _no_model(
+            "вердикт модели не получен (модель не настроена), контур не проверен",
+            notes,
+            "program: no model configured (VERDICT_MODE=off or VERDICT_MODEL empty)",
+        )
     try:
         req, resp = _model_call(images, metrics, notes)
     except ModelError as e:
-        return _no_model("вердикт модели не получен (модель не ответила), контур не проверен",
-                         notes, f"program: model call failed: {e}", e.request, "(no answer)")
+        return _no_model(
+            "вердикт модели не получен (модель не ответила), контур не проверен",
+            notes,
+            f"program: model call failed: {e}",
+            e.request,
+            "(no answer)",
+        )
     parsed = _parse(resp)
     if not parsed:
-        return _no_model("ответ модели не разобран или без причины, контур не проверен",
-                         notes, "program: model answer unparseable", req, resp)
+        return _no_model(
+            "ответ модели не разобран или без причины, контур не проверен",
+            notes,
+            "program: model answer unparseable",
+            req,
+            resp,
+        )
     v, reason = parsed
     return Verdict(v, reason, "model", notes, req, resp)

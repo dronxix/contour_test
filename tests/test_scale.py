@@ -1,4 +1,5 @@
 """Масштаб и формат: по штампу, по DPI с подгонкой к формату ГОСТ, по PDF."""
+
 import unittest
 from pathlib import Path
 
@@ -6,8 +7,7 @@ import numpy as np
 
 from contour.extract import binarize, frame_from_ink, frame_rect_from_lines, measure_stamp
 from contour.sheet import Sheet, decide_scale
-
-from synth import A4, PPM, draw_sheet, px
+from synth import A4, PPM, draw_sheet
 
 
 def blank(w_mm, h_mm, ppm):
@@ -37,7 +37,7 @@ class Scale(unittest.TestCase):
         s = Sheet(Path("x.png"), blank(420, 297, ppm), "image", file_dpi=300)
         sc = decide_scale(s, stamp_w_px=None)
         self.assertEqual(sc.fmt, "A4")
-        self.assertAlmostEqual(sc.px_per_mm / ppm, 2 ** 0.5, delta=0.01)
+        self.assertAlmostEqual(sc.px_per_mm / ppm, 2**0.5, delta=0.01)
 
     def test_pdf_uses_render_dpi(self):
         ppm = 300 / 25.4

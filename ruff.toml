@@ -1,0 +1,20 @@
+line-length = 120
+target-version = "py311"
+
+[lint]
+ignore = [
+    # любая ошибка на листе намеренно превращается в red для этого листа,
+    # а прогон идёт дальше (требование задания), поэтому except Exception
+    "BLE001",
+    # запасные записи на пути ошибки (overlay «не прочитан» и т. п.): если не
+    # получилось и это, лист уже red, и сообщать больше нечего
+    "S110",
+    # int(round(x)) оставлен намеренно: x часто скаляр numpy, а не float
+    "RUF046",
+]
+
+[format]
+quote-style = "double"
+
+[lint.isort]
+known-first-party = ["contour", "synth"]

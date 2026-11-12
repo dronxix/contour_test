@@ -1,5 +1,6 @@
 """Картинки и contour.json для каждого листа: overlay.png, preview.png,
 крупные планы видов, contour.json (verdict.txt и log.txt пишет pipeline.py)."""
+
 from __future__ import annotations
 
 import json
@@ -8,8 +9,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-CONTOUR_BGR = (255, 0, 200)      # малиновый: хорошо виден и на чёрном, и на белом
-DROPPED_BGR = (0, 170, 255)      # оранжевый для выброшенного; в overlay не рисуется (по ТЗ там только контур)
+CONTOUR_BGR = (255, 0, 200)  # малиновый: хорошо виден и на чёрном, и на белом
+DROPPED_BGR = (0, 170, 255)  # оранжевый для выброшенного; в overlay не рисуется (по ТЗ там только контур)
 
 
 def write_overlay(path: Path, gray: np.ndarray, segs_px, dropped_px, line_px: int) -> None:
@@ -22,11 +23,12 @@ def write_overlay(path: Path, gray: np.ndarray, segs_px, dropped_px, line_px: in
     # чертёж осветляется, чтобы контур выделялся
     base = (255 - (255 - base.astype(np.int16)) * 0.45).clip(0, 255).astype(np.uint8)
     for x1, y1, x2, y2 in segs_px:
-        cv2.line(base, (int(round(x1)), int(round(y1))), (int(round(x2)), int(round(y2))),
-                 CONTOUR_BGR, line_px, cv2.LINE_AA)
+        cv2.line(
+            base, (int(round(x1)), int(round(y1))), (int(round(x2)), int(round(y2))), CONTOUR_BGR, line_px, cv2.LINE_AA
+        )
     ok, buf = cv2.imencode(".png", base, [cv2.IMWRITE_PNG_COMPRESSION, 6])
     if not ok:
-        raise IOError("png encode failed")
+        raise OSError("png encode failed")
     buf.tofile(str(path))
 
 
@@ -38,8 +40,10 @@ def write_failure_image(path: Path, message: str) -> None:
     cv2.putText(img, "SHEET NOT PROCESSED - no contour", (30, 80), cv2.FONT_HERSHEY_SIMPLEX, 1.4, (0, 0, 220), 3)
     text = message.encode("ascii", "replace").decode()
     for i in range(0, min(len(text), 240), 80):
-        cv2.putText(img, text[i:i + 80], (30, 140 + 35 * (i // 80)), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
+        cv2.putText(img, text[i : i + 80], (30, 140 + 35 * (i // 80)), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
     ok, buf = cv2.imencode(".png", img)
+    if not ok:
+        raise RuntimeError(f"PNG encoding failed: {path.name}")
     buf.tofile(str(path))
 
 
@@ -53,14 +57,23 @@ def write_preview(path: Path, gray: np.ndarray, segs_px, max_side: int = 1024, l
     img = cv2.cvtColor(small, cv2.COLOR_GRAY2BGR)
     img = (255 - (255 - img.astype(np.int16)) * 0.55).clip(0, 255).astype(np.uint8)
     for x1, y1, x2, y2 in segs_px:
-        cv2.line(img, (int(round(x1 * s)), int(round(y1 * s))), (int(round(x2 * s)), int(round(y2 * s))),
-                 CONTOUR_BGR, line_px, cv2.LINE_AA)
+        cv2.line(
+            img,
+            (int(round(x1 * s)), int(round(y1 * s))),
+            (int(round(x2 * s)), int(round(y2 * s))),
+            CONTOUR_BGR,
+            line_px,
+            cv2.LINE_AA,
+        )
     ok, buf = cv2.imencode(".png", img)
+    if not ok:
+        raise RuntimeError(f"PNG encoding failed: {path.name}")
     buf.tofile(str(path))
 
 
-def view_boxes(segs_px, shape, ppm: float, gap_mm: float = 5.0, pad_mm: float = 4.0,
-               min_mm: float = 30.0) -> list[tuple[int, int, int, int]]:
+def view_boxes(
+    segs_px, shape, ppm: float, gap_mm: float = 5.0, pad_mm: float = 4.0, min_mm: float = 30.0
+) -> list[tuple[int, int, int, int]]:
     """Рамки (x0, y0, x1, y1 в пикселях) вокруг групп линий контура — видов детали.
 
     Линии контура ближе gap_mm друг к другу — одна группа. К рамке
@@ -70,7 +83,7 @@ def view_boxes(segs_px, shape, ppm: float, gap_mm: float = 5.0, pad_mm: float = 
     вниз, слева направо.
     """
     h, w = shape[:2]
-    q = max(1, int(round(ppm / 2)))                 # ячейки примерно 0,5 мм
+    q = max(1, int(round(ppm / 2)))  # ячейки примерно 0,5 мм
     m = np.zeros((h // q + 1, w // q + 1), np.uint8)
     for x1, y1, x2, y2 in segs_px:
         cv2.line(m, (int(x1 / q), int(y1 / q)), (int(x2 / q), int(y2 / q)), 1, 1)
@@ -105,23 +118,36 @@ def write_zoom(path: Path, gray: np.ndarray, segs_px, box, max_side: int = 1024,
     img = cv2.cvtColor(small, cv2.COLOR_GRAY2BGR)
     img = (255 - (255 - img.astype(np.int16)) * 0.55).clip(0, 255).astype(np.uint8)
     for a, b, c, d in segs_px:
-        cv2.line(img, (int(round((a - x0) * s)), int(round((b - y0) * s))),
-                 (int(round((c - x0) * s)), int(round((d - y0) * s))), CONTOUR_BGR, line_px, cv2.LINE_AA)
+        cv2.line(
+            img,
+            (int(round((a - x0) * s)), int(round((b - y0) * s))),
+            (int(round((c - x0) * s)), int(round((d - y0) * s))),
+            CONTOUR_BGR,
+            line_px,
+            cv2.LINE_AA,
+        )
     ok, buf = cv2.imencode(".png", img)
+    if not ok:
+        raise RuntimeError(f"PNG encoding failed: {path.name}")
     buf.tofile(str(path))
 
 
 def contour_hash(segs: list[dict]) -> str:
     """Отпечаток (SHA-1) координат контура: привязывает вердикт ревью именно к этому контуру."""
     import hashlib
+
     return hashlib.sha1(json.dumps(segs, sort_keys=True).encode()).hexdigest()
 
 
 def write_contour_json(path: Path, source: str, segs_px, px_per_mm: float, metrics: dict) -> str:
     """contour.json: отрезки в мм (до 0,001 мм); возвращает отпечаток контура."""
     segs = [
-        {"x1": round(x1 / px_per_mm, 3), "y1": round(y1 / px_per_mm, 3),
-         "x2": round(x2 / px_per_mm, 3), "y2": round(y2 / px_per_mm, 3)}
+        {
+            "x1": round(x1 / px_per_mm, 3),
+            "y1": round(y1 / px_per_mm, 3),
+            "x2": round(x2 / px_per_mm, 3),
+            "y2": round(y2 / px_per_mm, 3),
+        }
         for x1, y1, x2, y2 in segs_px
     ]
     data = {

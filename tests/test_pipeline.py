@@ -1,15 +1,15 @@
 """Весь лист целиком: контур в мм, детерминизм, пропуск готового, red для битого файла."""
+
 import json
 import os
 import tempfile
 import unittest
 from pathlib import Path
 
-os.environ["VERDICT_MODE"] = "off"          # модель не нужна: проверяется только программа
+os.environ["VERDICT_MODE"] = "off"  # модель не нужна: проверяется только программа
 os.environ["VERDICT_REVIEW_FILE"] = ""
 
 from contour.pipeline import is_done, process_file
-
 from synth import PART, draw_sheet, save
 
 
@@ -75,7 +75,7 @@ class Pipeline(unittest.TestCase):
         self.assertEqual(s["verdict"], "red")
         self.assertTrue((od / "overlay.png").exists())
         self.assertTrue((od / "contour.json").exists())
-        self.assertFalse((od / "done.json").exists())      # повторится при следующем запуске
+        self.assertFalse((od / "done.json").exists())  # повторится при следующем запуске
 
 
 if __name__ == "__main__":
